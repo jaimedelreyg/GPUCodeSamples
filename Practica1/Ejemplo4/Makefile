@@ -3,8 +3,8 @@
 ############################
 all : kernels main
 
-CUDA_INCLUDE=/usr/local/cuda/include/
-CUDA_LIB=/usr/local/cuda-7.5/lib64/
+CUDA_INCLUDE=/opt/cuda/include/
+CUDA_LIB=/opt/cuda/lib64/
 LIB=-lcudart -lcublas
 CC=gcc
 NVCC=nvcc 
