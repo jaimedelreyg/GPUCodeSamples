@@ -2,13 +2,45 @@
 // Kernel source file for calculating mandelbrot fractal
 // Author: Jaime del Rey
 
-_kernel
-void mandel_fractal(__global float ** tex,
-		    __global float scale,
-		    __global float width,
-		    __global float height,
-		    __global float cx,
-		    __global float cy)
+typedef struct {unsigned char r, g, b;} rgb_t;
+
+void hsv_to_rgb(int hue, int min, int max, __global rgb_t *p)
+{
+	int color_rotate = 0;
+	int saturation = 1;
+	int invert = 0;
+
+	if (min == max) max = min + 1;
+	if (invert) hue = max - (hue - min);
+	if (!saturation) {
+		p->r = p->g = p->b = 255 * (max - hue) / (max - min);
+		return;
+	}
+	double h = fmod(color_rotate + 1e-4 + 4.0 * (hue - min) / (max - min), 6);
+#	define VAL 255
+	double c = VAL * saturation;
+	double X = c * (1 - fabs(fmod(h, 2) - 1));
+ 
+	p->r = p->g = p->b = 0;
+ 
+	switch((int)h) {
+	case 0: p->r = c; p->g = X; return;
+	case 1: p->r = X; p->g = c; return;
+	case 2: p->g = c; p->b = X; return;
+	case 3: p->g = X; p->b = c; return;
+	case 4: p->r = X; p->b = c; return;
+	default:p->r = c; p->b = X;
+	}
+}
+
+__kernel
+void mandel_fractal(__global rgb_t *tex,
+		    const uint scale,
+		    const uint width,
+		    const uint height,
+		    const double cx,
+		    const double cy,
+		    const uint max_iter)
 
 {
 
@@ -35,8 +67,7 @@ for (iter=0; iter < max_iter; iter++) {
        	break;
 }
 
-*(unsigned short *)&(tex[i][j]) = iter;
 
+hsv_to_rgb(iter, 0, max_iter, &tex[(i * width + j)]);
 
 }
-

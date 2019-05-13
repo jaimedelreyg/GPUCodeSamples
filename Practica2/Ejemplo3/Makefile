@@ -5,7 +5,7 @@ endif
 
 CCFLAGS= -O3
 
-LIBS = -lglut -lGLU -lGL -lm -lOpenCL
+LIBS = -lglut -lGLU -lGL -lm -lOpenCL -g
 
 # Change this variable to specify the device type
 # to the OpenCL device type of choice. You can also

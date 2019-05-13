@@ -5,10 +5,19 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+#include "CL/cl.h"
+
 #define RUN_SERIAL     0
 #define RUN_OPENCL_CPU 1
 #define RUN_OPENCL_GPU 2
 int run_mode;
+
+//pick up device type from compiler command line or from 
+//the default type
+#ifndef DEVICE
+#define DEVICE CL_DEVICE_TYPE_DEFAULT
+#endif
  
 void set_texture();
  
@@ -25,6 +34,15 @@ int color_rotate = 0;
 int saturation = 1;
 int invert = 0;
 int max_iter = 256;
+
+static cl_mem d_o;
+static cl_device_id     device_id;     // compute device id 
+static cl_context       context;       // compute context
+static cl_command_queue commands;      // compute command queue
+static cl_program       program;       // compute program
+static cl_kernel        ko_mandel_fractal;       // compute kernel
+static int err;               // error code returned from OpenCL calls
+
  
 /* Time */
 #include <sys/time.h>
@@ -38,6 +56,117 @@ double getMicroSeconds()
 	t = ((tv0.tv_usec) + (tv0.tv_sec)*1000000);
 
 	return (t);
+}
+
+
+char *err_code (cl_int err_in)
+{
+    switch (err_in) {
+
+        case CL_SUCCESS :
+            return (char*)" CL_SUCCESS ";
+        case CL_DEVICE_NOT_FOUND :
+            return (char*)" CL_DEVICE_NOT_FOUND ";
+        case CL_DEVICE_NOT_AVAILABLE :
+            return (char*)" CL_DEVICE_NOT_AVAILABLE ";
+        case CL_COMPILER_NOT_AVAILABLE :
+            return (char*)" CL_COMPILER_NOT_AVAILABLE ";
+        case CL_MEM_OBJECT_ALLOCATION_FAILURE :
+            return (char*)" CL_MEM_OBJECT_ALLOCATION_FAILURE ";
+        case CL_OUT_OF_RESOURCES :
+            return (char*)" CL_OUT_OF_RESOURCES ";
+        case CL_OUT_OF_HOST_MEMORY :
+            return (char*)" CL_OUT_OF_HOST_MEMORY ";
+        case CL_PROFILING_INFO_NOT_AVAILABLE :
+            return (char*)" CL_PROFILING_INFO_NOT_AVAILABLE ";
+        case CL_MEM_COPY_OVERLAP :
+            return (char*)" CL_MEM_COPY_OVERLAP ";
+        case CL_IMAGE_FORMAT_MISMATCH :
+            return (char*)" CL_IMAGE_FORMAT_MISMATCH ";
+        case CL_IMAGE_FORMAT_NOT_SUPPORTED :
+            return (char*)" CL_IMAGE_FORMAT_NOT_SUPPORTED ";
+        case CL_BUILD_PROGRAM_FAILURE :
+            return (char*)" CL_BUILD_PROGRAM_FAILURE ";
+        case CL_MAP_FAILURE :
+            return (char*)" CL_MAP_FAILURE ";
+        case CL_MISALIGNED_SUB_BUFFER_OFFSET :
+            return (char*)" CL_MISALIGNED_SUB_BUFFER_OFFSET ";
+        case CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST :
+            return (char*)" CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST ";
+        case CL_INVALID_VALUE :
+            return (char*)" CL_INVALID_VALUE ";
+        case CL_INVALID_DEVICE_TYPE :
+            return (char*)" CL_INVALID_DEVICE_TYPE ";
+        case CL_INVALID_PLATFORM :
+            return (char*)" CL_INVALID_PLATFORM ";
+        case CL_INVALID_DEVICE :
+            return (char*)" CL_INVALID_DEVICE ";
+        case CL_INVALID_CONTEXT :
+            return (char*)" CL_INVALID_CONTEXT ";
+        case CL_INVALID_QUEUE_PROPERTIES :
+            return (char*)" CL_INVALID_QUEUE_PROPERTIES ";
+        case CL_INVALID_COMMAND_QUEUE :
+            return (char*)" CL_INVALID_COMMAND_QUEUE ";
+        case CL_INVALID_HOST_PTR :
+            return (char*)" CL_INVALID_HOST_PTR ";
+        case CL_INVALID_MEM_OBJECT :
+            return (char*)" CL_INVALID_MEM_OBJECT ";
+        case CL_INVALID_IMAGE_FORMAT_DESCRIPTOR :
+            return (char*)" CL_INVALID_IMAGE_FORMAT_DESCRIPTOR ";
+        case CL_INVALID_IMAGE_SIZE :
+            return (char*)" CL_INVALID_IMAGE_SIZE ";
+        case CL_INVALID_SAMPLER :
+            return (char*)" CL_INVALID_SAMPLER ";
+        case CL_INVALID_BINARY :
+            return (char*)" CL_INVALID_BINARY ";
+        case CL_INVALID_BUILD_OPTIONS :
+            return (char*)" CL_INVALID_BUILD_OPTIONS ";
+        case CL_INVALID_PROGRAM :
+            return (char*)" CL_INVALID_PROGRAM ";
+        case CL_INVALID_PROGRAM_EXECUTABLE :
+            return (char*)" CL_INVALID_PROGRAM_EXECUTABLE ";
+        case CL_INVALID_KERNEL_NAME :
+            return (char*)" CL_INVALID_KERNEL_NAME ";
+        case CL_INVALID_KERNEL_DEFINITION :
+            return (char*)" CL_INVALID_KERNEL_DEFINITION ";
+        case CL_INVALID_KERNEL :
+            return (char*)" CL_INVALID_KERNEL ";
+        case CL_INVALID_ARG_INDEX :
+            return (char*)" CL_INVALID_ARG_INDEX ";
+        case CL_INVALID_ARG_VALUE :
+            return (char*)" CL_INVALID_ARG_VALUE ";
+        case CL_INVALID_ARG_SIZE :
+            return (char*)" CL_INVALID_ARG_SIZE ";
+        case CL_INVALID_KERNEL_ARGS :
+            return (char*)" CL_INVALID_KERNEL_ARGS ";
+        case CL_INVALID_WORK_DIMENSION :
+            return (char*)" CL_INVALID_WORK_DIMENSION ";
+        case CL_INVALID_WORK_GROUP_SIZE :
+            return (char*)" CL_INVALID_WORK_GROUP_SIZE ";
+        case CL_INVALID_WORK_ITEM_SIZE :
+            return (char*)" CL_INVALID_WORK_ITEM_SIZE ";
+        case CL_INVALID_GLOBAL_OFFSET :
+            return (char*)" CL_INVALID_GLOBAL_OFFSET ";
+        case CL_INVALID_EVENT_WAIT_LIST :
+            return (char*)" CL_INVALID_EVENT_WAIT_LIST ";
+        case CL_INVALID_EVENT :
+            return (char*)" CL_INVALID_EVENT ";
+        case CL_INVALID_OPERATION :
+            return (char*)" CL_INVALID_OPERATION ";
+        case CL_INVALID_GL_OBJECT :
+            return (char*)" CL_INVALID_GL_OBJECT ";
+        case CL_INVALID_BUFFER_SIZE :
+            return (char*)" CL_INVALID_BUFFER_SIZE ";
+        case CL_INVALID_MIP_LEVEL :
+            return (char*)" CL_INVALID_MIP_LEVEL ";
+        case CL_INVALID_GLOBAL_WORK_SIZE :
+            return (char*)" CL_INVALID_GLOBAL_WORK_SIZE ";
+        case CL_INVALID_PROPERTY :
+            return (char*)" CL_INVALID_PROPERTY ";
+        default:
+            return (char*)"UNKNOWN ERROR";
+
+    }
 }
 
 void render()
@@ -139,18 +268,8 @@ void hsv_to_rgb(int hue, int min, int max, rgb_t *p)
 
 double calc_mandel_opencl()
 {
-    int          err;               // error code returned from OpenCL calls
-
-    size_t global;                  // global domain size  
-
-    cl_device_id     device_id;     // compute device id 
-    cl_context       context;       // compute context
-    cl_command_queue commands;      // compute command queue
-    cl_program       program;       // compute program
-    cl_kernel        ko_mandel_fractal;       // compute kernel
-    
-    cl_mem d_i;                     // device memory used for the input vector
-    cl_mem_d_o;			    // device memory used for the output vector
+    int i;
+    int j;
 
     // variables used to read kernel source file
     FILE *fp;
@@ -158,18 +277,8 @@ double calc_mandel_opencl()
     long readlen;
     char *kernel_src;  // char string to hold kernel source
 
-
-    int i;
-    int length;
-    if (argc==2)
-        length = atoi(argv[1]);
-    else {
-        length = 1024;
-        printf("./exec length (by default length=%i)\n", length);
-    }
-
     // read the kernel
-    fp = fopen("transpose_kernel.cl","r");
+    fp = fopen("mandel_kernel.cl","r");
     fseek(fp,0L, SEEK_END);
     filelen = ftell(fp);
     rewind(fp);
@@ -201,30 +310,22 @@ double calc_mandel_opencl()
     // Get all platforms
     cl_platform_id Platform[numPlatforms];
     err = clGetPlatformIDs(numPlatforms, Platform, NULL);
+
     if (err != CL_SUCCESS || numPlatforms <= 0)
     {
         printf("Error: Failed to get the platform!\n%s\n",err_code(err));
         return EXIT_FAILURE;
     }
 
-    // Secure a GPU
     for (i = 0; i < numPlatforms; i++)
     {
-	if(run_mode == RUN_OPENCL_CPU){
-        	err = clGetDeviceIDs(Platform[i],CL_DEVICE_TYPE_CPU , 1, &device_id, NULL);
-        	if (err == CL_SUCCESS)
-       		{
-           	 break;
-        	}
-	}
-	else{
-		err = clGetDeviceIDs(Platform[i],CL_DEVICE_TYPE_GPU , 1, &device_id, NULL);
-        	if (err == CL_SUCCESS)
-        	{
-            	break;
-        	}
+	err = clGetDeviceIDs(Platform[i], DEVICE, 1, &device_id, NULL);
+	if (err == CL_SUCCESS)
+	{
+		break;
 	}
     }
+
 
     if (device_id == NULL)
     {
@@ -232,7 +333,6 @@ double calc_mandel_opencl()
         return EXIT_FAILURE;
     }
 
-    err = output_device_info(device_id);
   
     // Create a compute context 
     context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
@@ -273,84 +373,73 @@ double calc_mandel_opencl()
 
     // Create the compute kernel from the program 
     ko_mandel_fractal = clCreateKernel(program, "mandel_fractal", &err);
-    if (!ko_vadd || err != CL_SUCCESS)
+    if (!ko_mandel_fractal || err != CL_SUCCESS)
     {
         printf("Error: Failed to create compute kernel!\n%s\n", err_code(err));
         return EXIT_FAILURE;
     }
 
     // Create the output arrays in device memory
-    d_o  = clCreateBuffer(context,  CL_MEM_READ_ONLY,  sizeof(float) * (width * height), NULL, NULL);
-    if (!d_o || !d_i)
+    d_o  = clCreateBuffer(context,  CL_MEM_READ_WRITE,  sizeof(rgb_t) * (width * height), NULL, NULL);
+    if (err != CL_SUCCESS)
     {
         printf("Error: Failed to allocate device memory!\n");
         exit(1);
-    }    
+    } 
+
     
-    // Write input and output vectors into compute device memory 
-    err = clEnqueueWriteBuffer(commands, d_o, CL_TRUE, 0, sizeof(float) * (width * height), tex, 0, NULL, NULL);
+    //Write output vectors into compute device memory 
+    err = clEnqueueWriteBuffer(commands, d_o, CL_TRUE, 0, sizeof(rgb_t) * (width * height), tex[0], 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
-        printf("Error: Failed to write h_b to source array!\n%s\n", err_code(err));
+       printf("Error: Failed to write d_o to source array!\n%s\n", err_code(err));
         exit(1);
     }
-	
+    
     // Set the arguments to our compute kernel
     err  = clSetKernelArg(ko_mandel_fractal, 0, sizeof(cl_mem), &d_o);
-    err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_mem), &scale);
-    err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_mem), &width);
-    err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_mem), &height);
-    err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_mem), &cx);
-    err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_mem), &cy);
+    err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_int), &scale);
+    err |= clSetKernelArg(ko_mandel_fractal, 2, sizeof(cl_int), &width);
+    err |= clSetKernelArg(ko_mandel_fractal, 3, sizeof(cl_int), &height);
+    err |= clSetKernelArg(ko_mandel_fractal, 4, sizeof(cl_double), &cx);
+    err |= clSetKernelArg(ko_mandel_fractal, 5, sizeof(cl_double), &cy);
+    err |= clSetKernelArg(ko_mandel_fractal, 6, sizeof(cl_int), &max_iter);
     if (err != CL_SUCCESS)
     {
         printf("Error: Failed to set kernel arguments!\n");
         exit(1);
     }
 
-    double t0 = getMicroSeconds();
-	
-    // Execute the kernel over the entire range of our 1d input data set
-    // letting the OpenCL runtime choose the work-group size
-    global = length;
-    err = clEnqueueNDRangeKernel(commands, ko_mandel_fractal, 1, NULL, &global, NULL, 0, NULL, NULL);
+    size_t global[2];
+    global[0] = height;
+    global[1] = width; 
+    
+    err = clEnqueueNDRangeKernel(commands, ko_mandel_fractal, 2, NULL, global, NULL, 0, NULL, NULL);
     if (err)
     {
         printf("Error: Failed to execute kernel!\n%s\n", err_code(err));
         return EXIT_FAILURE;
     }
 
-    // Wait for the commands to complete before stopping the timer
-    clFinish(commands);
-
-    double t0 = getMicroSeconds();
-    printf("\nThe kernel ran in %lf seconds\n",(t1-t0)/1000000);
-
-    // Read back the results from the compute device
-    err = clEnqueueReadBuffer( commands, d_o, CL_TRUE, 0, sizeof(float) * (width * height), tex, 0, NULL, NULL );  
+    //read output vectors into compute device memory 
+    err = clEnqueueReadBuffer(commands, d_o, CL_TRUE, 0, sizeof(rgb_t) * (width * height), tex[0], 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
-        printf("Error: Failed to read output array!\n%s\n", err_code(err));
+       printf("Error: Failed to read d_o to source array!\n%s\n", err_code(err));
         exit(1);
     }
     
-    // Display results
-    for (i = 0; i < height; i++)
-    	for (j = 0; j  < width; j++)
-    		hsv_to_rgb(*(unsigned short*)&(tex[i][j]), 0, max_iter, &(tex[i][j]));
-    
-    t0 = getMicroSeconds()-t0;
-
-    // cleanup then shutdown
-    clReleaseMemObject(d_i);
     clReleaseMemObject(d_o);
     clReleaseProgram(program);
+    clReleaseContext(context);
+    free(kernel_src);
     clReleaseKernel(ko_mandel_fractal);
     clReleaseCommandQueue(commands);
-    clReleaseContext(context);
 
-    return t0;
+return(1.0);
 }
+
+
  
 double calc_mandel()
 {
@@ -464,9 +553,9 @@ void init_gfx(int *c, char **v)
 	glutInit(c, v);
 	glutInitDisplayMode(GLUT_RGB);
 	glutInitWindowSize(640, 480);
-	glutDisplayFunc(render);
  
 	gwin = glutCreateWindow("Mandelbrot");
+	glutDisplayFunc(render);
  
 	glutKeyboardFunc(keypress);
 	glutMouseFunc(mouseclick);
