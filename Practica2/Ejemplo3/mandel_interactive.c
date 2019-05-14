@@ -8,20 +8,26 @@
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #include "CL/cl.h"
 
+/* Time */
+#include <sys/time.h>
+#include <sys/resource.h>
+
+//Run Modes
 #define RUN_SERIAL     0
 #define RUN_OPENCL_CPU 1
 #define RUN_OPENCL_GPU 2
 int run_mode;
 
-//pick up device type from compiler command line or from 
+//Pick up device type from compiler command line or from 
 //the default type
 #ifndef DEVICE
 #define DEVICE CL_DEVICE_TYPE_DEFAULT
 #endif
  
 void set_texture();
- 
 typedef struct {unsigned char r, g, b;} rgb_t;
+
+//HOST VARIABLES
 rgb_t **tex = 0;
 rgb_t *tex_ = 0;
 int gwin;
@@ -35,18 +41,15 @@ int saturation = 1;
 int invert = 0;
 int max_iter = 256;
 
-static cl_mem d_o;
-static cl_device_id     device_id;     // compute device id 
-static cl_context       context;       // compute context
-static cl_command_queue commands;      // compute command queue
-static cl_program       program;       // compute program
-static cl_kernel        ko_mandel_fractal;       // compute kernel
-static int err;               // error code returned from OpenCL calls
+//OPENCL VARIABLES
+static cl_mem d_o;				//Output buffer
+static cl_device_id     device_id;     		// compute device id 
+static cl_context       context;       		// compute context
+static cl_command_queue commands;      		// compute command queue
+static cl_program       program;       		// compute program
+static cl_kernel        ko_mandel_fractal;      // compute kernel
+static int err;               			// error code returned from OpenCL calls
 
- 
-/* Time */
-#include <sys/time.h>
-#include <sys/resource.h>
 
 static struct timeval tv0;
 double getMicroSeconds()
@@ -268,16 +271,17 @@ void hsv_to_rgb(int hue, int min, int max, rgb_t *p)
 
 double calc_mandel_opencl()
 {
+    //Variables for loops
     int i;
     int j;
 
-    // variables used to read kernel source file
+    // Variables used to read kernel source file
     FILE *fp;
     long filelen;
     long readlen;
     char *kernel_src;  // char string to hold kernel source
 
-    // read the kernel
+    // Load the kernel
     fp = fopen("mandel_kernel.cl","r");
     fseek(fp,0L, SEEK_END);
     filelen = ftell(fp);
@@ -296,9 +300,9 @@ double calc_mandel_opencl()
     
     
     // Set up platform and GPU device
-
     cl_uint numPlatforms;
 
+    
     // Find number of platforms
     err = clGetPlatformIDs(0, NULL, &numPlatforms);
     if (err != CL_SUCCESS || numPlatforms <= 0)
@@ -380,7 +384,7 @@ double calc_mandel_opencl()
     }
 
     // Create the output arrays in device memory
-    d_o  = clCreateBuffer(context,  CL_MEM_READ_WRITE,  sizeof(rgb_t) * (width * height), NULL, NULL);
+    d_o  = clCreateBuffer(context,  CL_MEM_READ_WRITE,  sizeof(unsigned char) * 3 * (width * height), NULL, NULL);
     if (err != CL_SUCCESS)
     {
         printf("Error: Failed to allocate device memory!\n");
@@ -389,7 +393,7 @@ double calc_mandel_opencl()
 
     
     //Write output vectors into compute device memory 
-    err = clEnqueueWriteBuffer(commands, d_o, CL_TRUE, 0, sizeof(rgb_t) * (width * height), tex[0], 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(commands, d_o, CL_TRUE, 0, sizeof(unsigned char)* 3 * (width * height), tex[0], 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
        printf("Error: Failed to write d_o to source array!\n%s\n", err_code(err));
@@ -422,7 +426,7 @@ double calc_mandel_opencl()
     }
 
     //read output vectors into compute device memory 
-    err = clEnqueueReadBuffer(commands, d_o, CL_TRUE, 0, sizeof(rgb_t) * (width * height), tex[0], 0, NULL, NULL);
+    err = clEnqueueReadBuffer(commands, d_o, CL_TRUE, 0, sizeof(unsigned char)* 3 * (width * height), tex[0], 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
        printf("Error: Failed to read d_o to source array!\n%s\n", err_code(err));
