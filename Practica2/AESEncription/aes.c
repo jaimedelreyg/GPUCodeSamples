@@ -1,7 +1,8 @@
 #include <stdio.h>
+#include <malloc.h>
 #include <stdlib.h>
-#include <time.h>
-#include <math.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "my_ocl.h"
 
@@ -58,7 +59,6 @@ unsigned char *readBMP(char *file_name, char header[54], int *w, int *h)
 	int height=*(int*)(header+22);
 	//**************************************
 
-
 	// Lectura de la imagen
 	//*************************************
 	unsigned char *image = (unsigned char*)malloc(imagesize+256+width*6); //Se reservan "imagesize+256+width*6" bytes y se devuelve un puntero a estos datos
@@ -107,7 +107,7 @@ void writeBMP(float *imageFLOAT, char *file_name, char header[54], int width, in
 		fprintf(stderr, "Escritos %d de %d bytes\n", n, imagesize+54);
 	fclose(f);
 
-	free(image);
+	//free(image);
 
 }
 
@@ -132,99 +132,21 @@ float *RGB2BW(unsigned char *imageUCHAR, int width, int height)
 	return(imageBW);
 }
 
-#define MAX_WINDOW_SIZE 5*5
-
-void mergeSort(float arr[],int low,int mid,int high){
-
-    int i,m,k,l;
-    float temp[MAX_WINDOW_SIZE];
-
-    l=low;
-    i=low;
-    m=mid+1;
-
-    while((l<=mid)&&(m<=high)){
-
-         if(arr[l]<=arr[m]){
-             temp[i]=arr[l];
-             l++;
-         }
-         else{
-             temp[i]=arr[m];
-             m++;
-         }
-         i++;
-    }
-
-    if(l>mid){
-         for(k=m;k<=high;k++){
-             temp[i]=arr[k];
-             i++;
-         }
-    }
-    else{
-         for(k=l;k<=mid;k++){
-             temp[i]=arr[k];
-             i++;
-         }
-    }
-   
-    for(k=low;k<=high;k++){
-         arr[k]=temp[k];
-    }
-}
-
-void buble_sort(float array[], int size)
-{
-	int i, j;
-	float tmp;
-
-	for (i=1; i<size; i++)
-		for (j=0 ; j<size - i; j++)
-			if (array[j] > array[j+1]){
-				tmp = array[j];
-				array[j] = array[j+1];
-				array[j+1] = tmp;
-			}
-}
-
-void remove_noise(float *im, float *image_out, 
-	float thredshold, int window_size,
-	int height, int width)
-{
-	int i, j, ii, jj;
-
-	float window[MAX_WINDOW_SIZE];
-	float median;
-	int ws2 = (window_size-1)>>1; 
-
-	for(i=ws2; i<height-ws2; i++)
-		for(j=ws2; j<width-ws2; j++)
-		{
-			for (ii =-ws2; ii<=ws2; ii++)
-				for (jj =-ws2; jj<=ws2; jj++)
-					window[(ii+ws2)*window_size + jj+ws2] = im[(i+ii)*width + j+jj];
-
-			// SORT
-			buble_sort(window, window_size*window_size);
-			median = window[(window_size*window_size-1)>>1];
-
-			if (fabsf((median-im[i*width+j])/median) <=thredshold)
-				image_out[i*width + j] = im[i*width+j];
-			else
-				image_out[i*width + j] = median;
-
-		}
-}
-
 void freeMemory(unsigned char *imageUCHAR, float *imageBW, float *imageOUT)
 {
 	//free(imageUCHAR);
-	free(imageBW);
-	free(imageOUT);
+	//free(imageBW);
+	//free(imageOUT);
 
 }	
 
+
+double aes_encription(float *im, float *im_out, int height, int width)
+{
+
+	printf("Not implemented yet\n");
+
+}
 
 int main(int argc, char **argv) {
 
@@ -254,21 +176,23 @@ int main(int argc, char **argv) {
 	// Aux. memory
 	float *imageOUT = (float *)malloc(sizeof(float)*width*height);
 
-	////////////////
-	// CANNY      //
-	////////////////
 	switch (argv[3][0]) {
 		case 'c':
 			t0 = get_time();
-			remove_noise(imageBW, imageOUT,
-				0.1, 3, height, width);
+			aes_encription(imageBW, imageOUT, height, width);
 			t1 = get_time();
 			printf("CPU Exection time %f ms.\n", t1-t0);
 			break;
 		case 'g':
 			t0 = get_time();
-			remove_noiseOCL(imageBW, imageOUT,
-				0.1, 3, height, width);
+			aes_encriptionOCL(imageBW, imageOUT, height, width);
+			t1 = get_time();
+			printf("OCL Exection time %f ms.\n", t1-t0);
+			break;
+
+                case 'd':
+			t0 = get_time();
+			aes_decriptionOCL(imgEncript, imageOUT, height, width);
 			t1 = get_time();
 			printf("OCL Exection time %f ms.\n", t1-t0);
 			break;
@@ -279,6 +203,7 @@ int main(int argc, char **argv) {
 	}
 
 
+        printf("%f",imageOUT[0]); 
 	// WRITE IMAGE
 	writeBMP(imageOUT, argv[2], header, width, height);
 

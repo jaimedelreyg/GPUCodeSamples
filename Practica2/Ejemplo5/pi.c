@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 	double t0, t1;
 	double pi;
 
-	if (argc==2){
+	if (argc==3){
 		n = atoi(argv[1]);
 	} else {
 		printf("./exec n [c,g] \n");
@@ -49,17 +49,16 @@ int main(int argc, char **argv)
 			t0 = get_time();
 			pi = calc_pi(n);
 			t1 = get_time();
-			printf("CPU Exection time %f ms. PI=%3.10f\n", t1-t0, pi);
+			printf("CPU Execution time %f ms. PI=%3.10f\n", t1-t0, pi);
 			break;
 		case 'g':
 			t0 = get_time();
 			pi= calc_piOCL(n);
 			t1 = get_time();
-			printf("OCL Exection time %f ms. PI=%3.10f\n", t1-t0, pi);
+			printf("OCL Execution time %f ms. PI=%3.10f\n", t1-t0, pi);
 			break;
 		default:
 			printf("Not Implemented yet!!\n");
-
 
 	}
 

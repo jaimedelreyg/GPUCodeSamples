@@ -23,7 +23,7 @@ endif
 
 CCFLAGS += -D DEVICE=$(DEVICE)
 
-main: my_ocl.c pi.c common.c
+main: my_ocl.c aes.c common.c
 	$(CC) $^ $(CCFLAGS) $(LIBS) -g -o $@
 
 

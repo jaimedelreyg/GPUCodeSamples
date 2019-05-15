@@ -29,7 +29,7 @@ typedef struct {unsigned char r, g, b;} rgb_t;
 
 //HOST VARIABLES
 rgb_t **tex = 0;
-rgb_t *tex_ = 0;
+int *tex_ = 0;
 int gwin;
 GLuint texture;
 int width, height;
@@ -384,7 +384,7 @@ double calc_mandel_opencl()
     }
 
     // Create the output arrays in device memory
-    d_o  = clCreateBuffer(context,  CL_MEM_READ_WRITE,  sizeof(unsigned char) * 3 * (width * height), NULL, NULL);
+    d_o  = clCreateBuffer(context,  CL_MEM_READ_WRITE,  sizeof(int)* tex_w * tex_h, NULL, NULL);
     if (err != CL_SUCCESS)
     {
         printf("Error: Failed to allocate device memory!\n");
@@ -392,17 +392,9 @@ double calc_mandel_opencl()
     } 
 
     
-    //Write output vectors into compute device memory 
-    err = clEnqueueWriteBuffer(commands, d_o, CL_TRUE, 0, sizeof(unsigned char)* 3 * (width * height), tex[0], 0, NULL, NULL);
-    if (err != CL_SUCCESS)
-    {
-       printf("Error: Failed to write d_o to source array!\n%s\n", err_code(err));
-        exit(1);
-    }
-    
     // Set the arguments to our compute kernel
     err  = clSetKernelArg(ko_mandel_fractal, 0, sizeof(cl_mem), &d_o);
-    err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_int), &scale);
+    err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_double), &scale);
     err |= clSetKernelArg(ko_mandel_fractal, 2, sizeof(cl_int), &width);
     err |= clSetKernelArg(ko_mandel_fractal, 3, sizeof(cl_int), &height);
     err |= clSetKernelArg(ko_mandel_fractal, 4, sizeof(cl_double), &cx);
@@ -415,8 +407,11 @@ double calc_mandel_opencl()
     }
 
     size_t global[2];
-    global[0] = height;
-    global[1] = width; 
+    global[0] = tex_h;
+    global[1] = tex_w;
+
+    tex_ = malloc(tex_h * tex_w * 3 * sizeof(rgb_t*));
+
     
     err = clEnqueueNDRangeKernel(commands, ko_mandel_fractal, 2, NULL, global, NULL, 0, NULL, NULL);
     if (err)
@@ -426,17 +421,24 @@ double calc_mandel_opencl()
     }
 
     //read output vectors into compute device memory 
-    err = clEnqueueReadBuffer(commands, d_o, CL_TRUE, 0, sizeof(unsigned char)* 3 * (width * height), tex[0], 0, NULL, NULL);
+    err = clEnqueueReadBuffer(commands, d_o, CL_TRUE, 0, sizeof(int) * tex_w * tex_h, tex_, 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
        printf("Error: Failed to read d_o to source array!\n%s\n", err_code(err));
         exit(1);
     }
-    
+	
+   
+    for (i = 0; i < height; i++)
+	for (j = 0; j  < width; j++)
+		hsv_to_rgb(tex_[i*width+j], 0, max_iter, &(tex[i][j]));
+	
+ 
     clReleaseMemObject(d_o);
     clReleaseProgram(program);
     clReleaseContext(context);
     free(kernel_src);
+    free(tex_);
     clReleaseKernel(ko_mandel_fractal);
     clReleaseCommandQueue(commands);
 
@@ -466,6 +468,7 @@ double calc_mandel()
 				if (zx2+zy2>max_iter)
 					break;
 			}
+
 			
 			*(unsigned short *)&(tex[i][j]) = iter;
 		}
@@ -476,6 +479,7 @@ double calc_mandel()
 			hsv_to_rgb(*(unsigned short*)&(tex[i][j]), 0, max_iter, &(tex[i][j]));
 
 	return(getMicroSeconds()-t0);
+
 }
  
 void alloc_tex()
@@ -499,7 +503,7 @@ void set_texture()
 
 	alloc_tex();
 	switch (run_mode){
-		case RUN_SERIAL:	   t=calc_mandel(); break;
+		case RUN_SERIAL: t=calc_mandel(); break;
 		case RUN_OPENCL_CPU: t=calc_mandel_opencl(); break;
 		case RUN_OPENCL_GPU: t=calc_mandel_opencl();
 	};

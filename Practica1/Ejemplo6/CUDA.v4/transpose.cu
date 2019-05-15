@@ -134,7 +134,60 @@ __global__ void transpose_device_v1(float *in, float *out, int rows, int cols)
 			out [ i * rows + j ] = in [ j * cols + i ]; 
 }
 
+__global__ void transpose_device_v2(float *in, float *out, int rows, int cols) 
+{
+	//Accesos alineados/desalineados?? 
+	int i, j; 
+	i = blockIdx.x * blockDim.x + threadIdx.x;
+	j = blockIdx.y * blockDim.y + threadIdx.y;
 
+	if (i < rows && j < cols)
+		out [ i * rows + j ] = in [ j * cols + i ]; 
+}
+
+__global__ void transpose_device_v3(float *in, float *out, int rows, int cols) 
+{
+	int i,j;
+	__shared__ float tile[TILE_DIM][TILE_DIM];
+
+	i = blockIdx.x * blockDim.x + threadIdx.x; 
+	j = blockIdx.y * blockDim.y + threadIdx.y;
+	
+	if(i < rows && j<cols){
+	
+		tile[i][j] = in[j * cols + i]; 
+		__syncthreads();
+
+		i = threadIdx.x;
+		j = threadIdx.y;	
+
+		out [ i * cols + j ] = tile [i][j]; 
+
+	} 
+}
+
+
+__global__ void transpose_device_v4(float *in, float *out, int rows, int cols) 
+{
+	int i,j;
+
+	__shared__ float tile[TILE_DIM][TILE_DIM + 1];
+
+	i = blockIdx.x * blockDim.x + threadIdx.x; 
+	j = blockIdx.y * blockDim.y + threadIdx.y;
+	
+	if(i < rows && j<cols){
+	
+		tile[i][j] = in[j * cols + i]; 
+		__syncthreads();
+
+		i = threadIdx.x;
+		j = threadIdx.y;	
+
+		out [ i * cols + j ] = tile [i][j]; 
+
+	} 
+}
 
 int check(float *GPU, float *CPU, int n)
 {
@@ -191,7 +244,7 @@ int main(int argc, char **argv)
 	dim3 dimGrid(blocks);
 
 	t0 = getMicroSeconds();
-	transpose_device_v1<<<dimGrid,dimBlock>>>(darray1D, darray1D_trans, n, n);	
+	transpose_device_v2<<<dimGrid,dimBlock>>>(darray1D, darray1D_trans, n, n);	
 	cudaMemcpy(array1D_trans_GPU, darray1D_trans, n*n*sizeof(float), cudaMemcpyDeviceToHost);
 	cudaThreadSynchronize();
 	
