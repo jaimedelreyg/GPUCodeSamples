@@ -148,11 +148,56 @@ double aes_encription(float *im, float *im_out, int height, int width)
 
 }
 
+float* getEncriptedFile(char* file_name){
+
+	int filelen = 0;
+	FILE *fp;
+	float* array;
+	float num;
+
+	
+	fp = fopen(file_name,"r");
+	
+	//file length	
+	while(!feof(fp)){
+	  filelen++;
+	  fscanf(fp,"%f",&num);
+	}
+
+	printf("Floats readed= %i\n", filelen);
+
+	rewind(fp);
+
+	array = malloc(sizeof(float)*(filelen-1));
+
+	for(int i = 0; i < filelen; i++)
+		fscanf(fp,"%f",&array[i]);
+
+	fclose(fp);
+
+	return array;
+
+}
+
+void writeEncriptedFile(float* array, int size){
+
+   FILE *filePtr;
+ 
+   filePtr = fopen("encripted.txt","w");
+ 
+   for (int i = 0; i < size; i++) {
+      fprintf(filePtr, "%lf\n", array[i]);
+   }
+   fclose(filePtr);
+}
+
+
 int main(int argc, char **argv) {
 
 	int width, height;
 	unsigned char *imageUCHAR;
 	float *imageBW;
+	float *imgENC;
 
 	char header[54];
 
@@ -167,34 +212,38 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-
-	// READ IMAGE & Convert image
-	imageUCHAR = readBMP(argv[1], header, &width, &height);
-	imageBW = RGB2BW(imageUCHAR, width, height);
-
-
 	// Aux. memory
 	float *imageOUT = (float *)malloc(sizeof(float)*width*height);
 
 	switch (argv[3][0]) {
 		case 'c':
+			// READ IMAGE & Convert image
+			imageUCHAR = readBMP(argv[1], header, &width, &height);
+			imageBW = RGB2BW(imageUCHAR, width, height);
 			t0 = get_time();
 			aes_encription(imageBW, imageOUT, height, width);
 			t1 = get_time();
 			printf("CPU Exection time %f ms.\n", t1-t0);
 			break;
 		case 'g':
+			// READ IMAGE & Convert image
+			imageUCHAR = readBMP(argv[1], header, &width, &height);
+			imageBW = RGB2BW(imageUCHAR, width, height);
 			t0 = get_time();
 			aes_encriptionOCL(imageBW, imageOUT, height, width);
 			t1 = get_time();
 			printf("OCL Exection time %f ms.\n", t1-t0);
+			writeEncriptedFile(imageOUT,sizeof(float)*width*height);
 			break;
 
                 case 'd':
+			imageENC = getEncriptedFile(argv[1]);
 			t0 = get_time();
-			aes_decriptionOCL(imgEncript, imageOUT, height, width);
+			aes_decriptionOCL(imgENC, imageOUT, height, width);
 			t1 = get_time();
 			printf("OCL Exection time %f ms.\n", t1-t0);
+			// WRITE IMAGE
+			writeBMP(imageOUT, argv[2], header, width, height);
 			break;
 		default:
 			printf("Not Implemented yet!!\n");
@@ -203,9 +252,6 @@ int main(int argc, char **argv) {
 	}
 
 
-        printf("%f",imageOUT[0]); 
-	// WRITE IMAGE
-	writeBMP(imageOUT, argv[2], header, width, height);
 
 	freeMemory(imageUCHAR, imageBW, imageOUT);	
 }
