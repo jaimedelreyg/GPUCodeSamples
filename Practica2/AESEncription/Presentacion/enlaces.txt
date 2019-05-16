@@ -1,0 +1,1 @@
+hsm gemalto: https://safenet.gemalto.es/data-encryption/hardware-security-modules-hsms/safenet-network-hsm/
