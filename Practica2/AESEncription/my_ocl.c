@@ -25,7 +25,7 @@ int lookup_table[] = {15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0};
 
 #define N_KEYS 10
 
-int aes_encriptionOCL(float *im, float *im_out, int height, int width) 
+int aes_encriptionOCL(double *im, double *im_out, int height, int width) 
 {
 	cl_mem img_d;
 	cl_mem keys_d;
@@ -41,6 +41,7 @@ int aes_encriptionOCL(float *im, float *im_out, int height, int width)
 	cl_program program;
 	cl_kernel kernel;
 	size_t global[2];
+	size_t local[1];
 	
 	// variables used to read kernel source file
 	FILE *fp;
@@ -183,7 +184,7 @@ int aes_encriptionOCL(float *im, float *im_out, int height, int width)
             exit(1);
         } 
 
-	err = clEnqueueWriteBuffer(commands, img_d, CL_TRUE, 0, sizeof(float) * width * height, im, 0, NULL, NULL);
+	err = clEnqueueWriteBuffer(commands, img_d, CL_TRUE, 0, sizeof(double) * width * height, im, 0, NULL, NULL);
         if (err != CL_SUCCESS)
         {
            printf("Error: Failed to write im to source array!\n%s\n", err_code(err));
@@ -224,7 +225,7 @@ int aes_encriptionOCL(float *im, float *im_out, int height, int width)
 	// global worksize = global, 
 	// local worksize = NULL - let OpenCL runtime determine
 	// No event wait list
-	err = clEnqueueNDRangeKernel(command_queue, kernel, 2, NULL, 
+	err = clEnqueueNDRangeKernel(command_queue, kernel, 2 , NULL, 
                                    global, NULL, 0, NULL, NULL);
 
 	if (err != CL_SUCCESS)
@@ -255,7 +256,7 @@ int aes_encriptionOCL(float *im, float *im_out, int height, int width)
 
 }
 
-int aes_decriptionOCL(float *im, float *im_out, int height, int width) 
+int aes_decriptionOCL(double *im, double *im_out, int height, int width) 
 {
 	cl_mem img_d;
 	cl_mem keys_d;
@@ -413,7 +414,7 @@ int aes_decriptionOCL(float *im, float *im_out, int height, int width)
             exit(1);
         } 
 
-	err = clEnqueueWriteBuffer(commands, img_d, CL_TRUE, 0, sizeof(float) * width * height, im, 0, NULL, NULL);
+	err = clEnqueueWriteBuffer(commands, img_d, CL_TRUE, 0, sizeof(double) * width * height, im, 0, NULL, NULL);
         if (err != CL_SUCCESS)
         {
            printf("Error: Failed to write im to source array!\n%s\n", err_code(err));

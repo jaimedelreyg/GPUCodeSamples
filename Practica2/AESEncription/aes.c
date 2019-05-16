@@ -78,7 +78,7 @@ unsigned char *readBMP(char *file_name, char header[54], int *w, int *h)
 	return(image);
 }
 
-void writeBMP(float *imageFLOAT, char *file_name, char header[54], int width, int height)
+void writeBMP(double *imageFLOAT, char *file_name, char header[54], int width, int height)
 {
 
 	FILE *f;
@@ -104,7 +104,7 @@ void writeBMP(float *imageFLOAT, char *file_name, char header[54], int width, in
 	n=fwrite(header, 1, 54, f);		//Primeramente se escribe la cabecera de la imagen
 	n+=fwrite(image, 1, imagesize, f);	//Y despues se escribe el resto de la imagen
 	if (n!=54+imagesize)			//Si se han escrito diferente cantidad de bytes que la suma de la cabecera y el tamanyo de la imagen. Ha habido error
-		fprintf(stderr, "Escritos %d de %d bytes\n", n, imagesize+54);
+		fprintf(stderr, "Escritos %lf de %lf bytes\n", n, imagesize+54);
 	fclose(f);
 
 	//free(image);
@@ -112,10 +112,10 @@ void writeBMP(float *imageFLOAT, char *file_name, char header[54], int width, in
 }
 
 
-float *RGB2BW(unsigned char *imageUCHAR, int width, int height)
+double *RGB2BW(unsigned char *imageUCHAR, int width, int height)
 {
 	int i, j;
-	float *imageBW = (float *)malloc(sizeof(float)*width*height);
+	double *imageBW = (double *)malloc(sizeof(double)*width*height);
 
 	unsigned char R, B, G;
 
@@ -132,7 +132,7 @@ float *RGB2BW(unsigned char *imageUCHAR, int width, int height)
 	return(imageBW);
 }
 
-void freeMemory(unsigned char *imageUCHAR, float *imageBW, float *imageOUT)
+void freeMemory(unsigned char *imageUCHAR, double *imageBW, double *imageOUT)
 {
 	//free(imageUCHAR);
 	//free(imageBW);
@@ -141,64 +141,65 @@ void freeMemory(unsigned char *imageUCHAR, float *imageBW, float *imageOUT)
 }	
 
 
-double aes_encription(float *im, float *im_out, int height, int width)
-{
 
-	printf("Not implemented yet\n");
-
-}
-
-float* getEncriptedFile(char* file_name){
+double* getEncriptedFile(char* file_name){
 
 	int filelen = 0;
 	FILE *fp;
-	float* array;
-	float num;
+	double* array;
+	double num;
 
-	
+	printf("Leemos txt encriptado\n");
 	fp = fopen(file_name,"r");
 	
 	//file length	
 	while(!feof(fp)){
 	  filelen++;
-	  fscanf(fp,"%f",&num);
+	  fscanf(fp,"%lf",&num);
 	}
 
 	printf("Floats readed= %i\n", filelen);
 
 	rewind(fp);
 
-	array = malloc(sizeof(float)*(filelen-1));
+	array = (double*)malloc(sizeof(double)*(filelen-1));
 
-	for(int i = 0; i < filelen; i++)
-		fscanf(fp,"%f",&array[i]);
+	for(int i = 0; i <= filelen; i++){
+		fscanf(fp,"%lf",&num);
+                array[i]=num;
+        }
 
 	fclose(fp);
-
-	return array;
+	printf("Encriptación cargada\n");
+        printf("segundo number:  %lf",array[4]);
+	return (array);
 
 }
 
-void writeEncriptedFile(float* array, int size){
+void writeEncriptedFile(char* file_name,double* array, int size){
 
    FILE *filePtr;
+   int filelen=0;
  
-   filePtr = fopen("encripted.txt","w");
+   filePtr = fopen(file_name,"w");
  
    for (int i = 0; i < size; i++) {
       fprintf(filePtr, "%lf\n", array[i]);
+      filelen++;
    }
+
+   printf("Floats written: %i\n",filelen);
    fclose(filePtr);
 }
 
 
 int main(int argc, char **argv) {
 
-	int width, height;
+	int width = 512, height = 512;
 	unsigned char *imageUCHAR;
-	float *imageBW;
-	float *imgENC;
-
+	double *imageBW;
+	double *imgENC;
+	double *imageOUT;
 	char header[54];
 
 
@@ -212,36 +213,30 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	// Aux. memory
-	float *imageOUT = (float *)malloc(sizeof(float)*width*height);
-
 	switch (argv[3][0]) {
-		case 'c':
-			// READ IMAGE & Convert image
-			imageUCHAR = readBMP(argv[1], header, &width, &height);
-			imageBW = RGB2BW(imageUCHAR, width, height);
-			t0 = get_time();
-			aes_encription(imageBW, imageOUT, height, width);
-			t1 = get_time();
-			printf("CPU Exection time %f ms.\n", t1-t0);
-			break;
 		case 'g':
-			// READ IMAGE & Convert image
+			
 			imageUCHAR = readBMP(argv[1], header, &width, &height);
 			imageBW = RGB2BW(imageUCHAR, width, height);
+	
+			// Aux. memory
+			imageOUT = (double *)malloc(sizeof(double)*width*height);
+			
+			// READ IMAGE & Convert image
 			t0 = get_time();
 			aes_encriptionOCL(imageBW, imageOUT, height, width);
 			t1 = get_time();
-			printf("OCL Exection time %f ms.\n", t1-t0);
-			writeEncriptedFile(imageOUT,sizeof(float)*width*height);
+			printf("OCL Exection time %lf ms.\n", t1-t0);
+			writeEncriptedFile(argv[2],imageOUT,width*height);
 			break;
 
                 case 'd':
-			imageENC = getEncriptedFile(argv[1]);
+			imgENC = getEncriptedFile(argv[1]);
+			imageOUT = (double *)malloc(sizeof(double)*width*height);
 			t0 = get_time();
 			aes_decriptionOCL(imgENC, imageOUT, height, width);
 			t1 = get_time();
-			printf("OCL Exection time %f ms.\n", t1-t0);
+			printf("OCL Exection time %lf ms.\n", t1-t0);
 			// WRITE IMAGE
 			writeBMP(imageOUT, argv[2], header, width, height);
 			break;
