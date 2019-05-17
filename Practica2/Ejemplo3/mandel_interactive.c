@@ -275,6 +275,8 @@ double calc_mandel_opencl()
     int i;
     int j;
 
+    double t0 = 0;
+
     // Variables used to read kernel source file
     FILE *fp;
     long filelen;
@@ -384,7 +386,7 @@ double calc_mandel_opencl()
     }
 
     // Create the output arrays in device memory
-    d_o  = clCreateBuffer(context,  CL_MEM_READ_WRITE,  sizeof(int)* tex_w * tex_h, NULL, NULL);
+    d_o  = clCreateBuffer(context,  CL_MEM_READ_WRITE, tex_h * tex_w * 3, NULL, NULL);
     if (err != CL_SUCCESS)
     {
         printf("Error: Failed to allocate device memory!\n");
@@ -395,11 +397,15 @@ double calc_mandel_opencl()
     // Set the arguments to our compute kernel
     err  = clSetKernelArg(ko_mandel_fractal, 0, sizeof(cl_mem), &d_o);
     err |= clSetKernelArg(ko_mandel_fractal, 1, sizeof(cl_double), &scale);
-    err |= clSetKernelArg(ko_mandel_fractal, 2, sizeof(cl_int), &width);
-    err |= clSetKernelArg(ko_mandel_fractal, 3, sizeof(cl_int), &height);
-    err |= clSetKernelArg(ko_mandel_fractal, 4, sizeof(cl_double), &cx);
-    err |= clSetKernelArg(ko_mandel_fractal, 5, sizeof(cl_double), &cy);
-    err |= clSetKernelArg(ko_mandel_fractal, 6, sizeof(cl_int), &max_iter);
+    err |= clSetKernelArg(ko_mandel_fractal, 2, sizeof(cl_int), &tex_w);
+    err |= clSetKernelArg(ko_mandel_fractal, 3, sizeof(cl_int), &tex_h);
+    err |= clSetKernelArg(ko_mandel_fractal, 4, sizeof(cl_int), &tex_w);
+    err |= clSetKernelArg(ko_mandel_fractal, 5, sizeof(cl_double), &cx);
+    err |= clSetKernelArg(ko_mandel_fractal, 6, sizeof(cl_double), &cy);
+    err |= clSetKernelArg(ko_mandel_fractal, 7, sizeof(cl_int), &max_iter);
+    err |= clSetKernelArg(ko_mandel_fractal, 8, sizeof(cl_int), &saturation);
+    err |= clSetKernelArg(ko_mandel_fractal, 9, sizeof(cl_int), &invert);
+    err |= clSetKernelArg(ko_mandel_fractal, 10, sizeof(cl_int), &color_rotate);
     if (err != CL_SUCCESS)
     {
         printf("Error: Failed to set kernel arguments!\n");
@@ -410,8 +416,8 @@ double calc_mandel_opencl()
     global[0] = tex_h;
     global[1] = tex_w;
 
-    tex_ = malloc(tex_h * tex_w * 3 * sizeof(rgb_t*));
-
+	
+    t0 = getMicroSeconds();
     
     err = clEnqueueNDRangeKernel(commands, ko_mandel_fractal, 2, NULL, global, NULL, 0, NULL, NULL);
     if (err)
@@ -421,28 +427,22 @@ double calc_mandel_opencl()
     }
 
     //read output vectors into compute device memory 
-    err = clEnqueueReadBuffer(commands, d_o, CL_TRUE, 0, sizeof(int) * tex_w * tex_h, tex_, 0, NULL, NULL);
+    err = clEnqueueReadBuffer(commands, d_o, CL_TRUE, 0, tex_h * tex_w * 3 , tex[0], 0, NULL, NULL);
     if (err != CL_SUCCESS)
     {
        printf("Error: Failed to read d_o to source array!\n%s\n", err_code(err));
         exit(1);
     }
 	
-   
-    for (i = 0; i < height; i++)
-	for (j = 0; j  < width; j++)
-		hsv_to_rgb(tex_[i*width+j], 0, max_iter, &(tex[i][j]));
-	
  
     clReleaseMemObject(d_o);
     clReleaseProgram(program);
     clReleaseContext(context);
     free(kernel_src);
-    free(tex_);
     clReleaseKernel(ko_mandel_fractal);
     clReleaseCommandQueue(commands);
 
-return(1.0);
+return(getMicroSeconds()-t0);
 }
 
 
@@ -473,6 +473,7 @@ double calc_mandel()
 			*(unsigned short *)&(tex[i][j]) = iter;
 		}
 	}
+
  
 	for (i = 0; i < height; i++)
 		for (j = 0; j  < width; j++)
@@ -488,12 +489,14 @@ void alloc_tex()
 
 	for (tex_w = 1; tex_w < width;  tex_w <<= 1);
 	for (tex_h = 1; tex_h < height; tex_h <<= 1);
+
  
 	if (tex_h != oh || tex_w != ow)
 		tex = realloc(tex, tex_h * tex_w * 3 + tex_h * sizeof(rgb_t*));
  
 	for (tex[0] = (rgb_t *)(tex + tex_h), i = 1; i < tex_h; i++)
 		tex[i] = tex[i - 1] + tex_w;
+
 }
  
 void set_texture()
@@ -546,7 +549,7 @@ void mouseclick(int button, int state, int x, int y)
  
 void resize(int w, int h)
 {
-	//printf("resize %d %d\n", w, h);
+	printf("resize %d %d\n", w, h);
 	width = w;
 	height = h;
  
